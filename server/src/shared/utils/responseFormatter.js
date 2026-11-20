@@ -1,6 +1,8 @@
 /**
  * ResponseFormatter - Utility class for formatting API responses in a consistent structure.
  * This class can be extended in the future to include additional response types or features as needed.
+ * Your ResponseFormatter class is responsible for creating a consistent structure for API responses, including error responses.
+ * Formats the response into a consistent JSON structure.
  */
 class ResponseFormatter {
 
