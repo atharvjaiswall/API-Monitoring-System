@@ -11,11 +11,7 @@ import ResponseFormatter from './shared/utils/responseFormatter.js';
 import cookieParser from "cookie-parser"
 
 // Routers
-
-// import authRouter from "./services/auth/routes/authRouter.js";
-// import clientRouter from './services/client/routes/clientRoutes.js';
-// import ingestRouter from "./services/ingest/routes/ingestRoutes.js"
-// import analyticsRouter from "./services/analytics/routes/analyticsRoutes.js"
+import authRouter from "./services/auth/routes/authRouter.js"
 
 /**
  * Initialize Express app
@@ -87,10 +83,7 @@ app.get("/", (req, res) => {
 /**
  * API Routes
  */
-// app.use("/api/auth", authRouter);
-// app.use("/api/hit", ingestRouter);
-// app.use("/api/analytics", analyticsRouter)
-// app.use("/api", clientRouter)
+app.use("/api/auth", authRouter)
 
 /**
  * 404 Handler
@@ -104,7 +97,6 @@ app.use(errorHandler)
 /**
  * Initialize database connections and start the server
  */
-
 async function initializeConnection() {
     try {
         logger.info("Initializing database connections...");
@@ -125,7 +117,6 @@ async function initializeConnection() {
     }
 }
 
-
 /**
  * Start the Express server after establishing database connections.
  * Also sets up graceful shutdown handlers for SIGINT and SIGTERM signals.
@@ -142,7 +133,7 @@ async function startServer() {
             logger.info(`API available at: http://localhost:${config.port}`);
         });
 
-        // if server getting close then u should also close database connection,rabbitmq connection
+
         const gracefulShutdown = async (signal) => {
             logger.info(`${signal} received, shutting down gracefully...`);
 
@@ -168,7 +159,6 @@ async function startServer() {
 
         }
 
-        // signal for the graceful shut down
         process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
         process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 

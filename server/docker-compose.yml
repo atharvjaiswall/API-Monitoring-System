@@ -1,3 +1,35 @@
+# Settings for containers. Inside Docker, "localhost" is the container itself,
+# so services must be reached by their compose service names (postgres, mongo, rabbitmq).
+x-app-env: &app-env
+  NODE_ENV: ${NODE_ENV}
+  PORT: ${PORT}
+
+  # MongoDB
+  MONGO_URI: ${MONGO_URI}
+  MONGO_DB_NAME: ${MONGO_DB_NAME}
+
+  # PostgreSQL (internal port is always 5432; 5433 is only the host-side port)
+  PG_HOST: postgres
+  PG_PORT: 5432
+  PG_DATABASE: ${PG_DATABASE}
+  PG_USER: ${PG_USER}
+  PG_PASSWORD: ${PG_PASSWORD}
+
+  # RabbitMQ
+  RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@localhost:5672/${RABBITMQ_DEFAULT_VHOST}
+  RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
+
+  # Security
+  JWT_SECRET: ${JWT_SECRET}
+  JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+
+  # Rate Limiting
+  RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
+  RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
+
+  # API Keys (blank if not set in .env)
+  VALID_API_KEYS: ${VALID_API_KEYS:-}
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -8,7 +40,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./scripts/init-postgres.sql:/docker-entrypoint-initdb.d/init-postgres.sql
@@ -31,7 +63,6 @@ services:
     networks:
       - api-monitoring-network
     restart: unless-stopped
-
 
   # RabbitMQ Message Queue
   rabbitmq:
@@ -72,43 +103,13 @@ services:
     depends_on:
       - postgres
 
-#  khud ki app ki image
-  api-app:
+  # khud ki app ki image
+  api-app: 
     build:
       context: .
       dockerfile: Dockerfile
     container_name: api-monitoring-app
-
-    environment:
-      NODE_ENV: ${NODE_ENV}
-      PORT: ${PORT}
-
-      # MongoDB
-      MONGO_URI: ${MONGO_URI}
-      MONGO_DB_NAME: ${MONGO_DB_NAME}
-
-      # PostgreSQL
-      PG_HOST: ${PG_HOST}
-      PG_PORT: ${PG_PORT}
-      PG_DATABASE: ${PG_DATABASE}
-      PG_USER: ${PG_USER}
-      PG_PASSWORD: ${PG_PASSWORD}
-
-      # RabbitMQ
-      RABBITMQ_URL: ${RABBITMQ_URL}
-      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
-
-      # Security
-      JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
-
-      # Rate Limiting
-      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS}
-      RATE_LIMIT_MAX_REQUESTS: ${RATE_LIMIT_MAX_REQUESTS}
-
-      # API Keys
-      VALID_API_KEYS: ${VALID_API_KEYS}
-
+    environment: *app-env
     ports:
       - "5000:5000"
     volumes:
@@ -120,50 +121,16 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      # uses Node itself, so it works on any base image (no curl/wget needed)
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
-
-  consumer:
-    build:
-      context: .
-      dockerfile: Dockerfile.consumer
-    container_name: api-monitoring-consumer
-
-    environment:
-      NODE_ENV: ${NODE_ENV}
-
-      # MongoDB
-      MONGO_URI: ${MONGO_URI}
-      MONGO_DB_NAME: ${MONGO_DB_NAME}
-
-      # PostgreSQL
-      PG_HOST: ${PG_HOST}
-      PG_PORT: ${PG_PORT}
-      PG_DATABASE: ${PG_DATABASE}
-      PG_USER: ${PG_USER}
-      PG_PASSWORD: ${PG_PASSWORD}
-
-      # RabbitMQ
-      RABBITMQ_URL: ${RABBITMQ_URL}
-      RABBITMQ_QUEUE: ${RABBITMQ_QUEUE}
-
-      # Security
-      JWT_SECRET: ${JWT_SECRET}
-
-    volumes:
-      - ./logs:/app/logs
-    networks:
-      - api-monitoring-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    restart: unless-stopped
+      start_period: 20s
 
 volumes:
   postgres_data:
